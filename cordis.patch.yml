@@ -1,0 +1,6 @@
+- insert:
+    - id: dsh-wsl-mail
+      name: dsh-wsl-mail
+      config:
+        enabled: true
+        timeoutMs: 30000
