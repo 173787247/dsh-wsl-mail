@@ -1,4 +1,4 @@
-import { mailStatus, himalayaList, notmuchSearch } from "./lib/mail.js";
+import { mailStatus, himalayaList, notmuchSearch, mailUnread } from "./lib/mail.js";
 
 export const name = "dsh-wsl-mail";
 export const inject = ["tools", "systemPrompt"];
@@ -14,14 +14,14 @@ export function apply(ctx, config = {}) {
   ctx.systemPrompt.section({
     name: "tool:mail",
     order: 139,
-    text: "dsh-wsl-mail lists mail via himalaya envelopes or notmuch search. It does not send or delete mail. Configure himalaya/notmuch yourself; never paste IMAP passwords into chat.",
+    text: "dsh-wsl-mail lists mail via himalaya envelopes or notmuch search. Prefer mail_unread for a quick unread check. It does not send or delete mail. Configure himalaya/notmuch yourself; never paste IMAP passwords into chat.",
   });
 
   ctx.tools.register({
     name: "mail_status",
     description: "Whether himalaya / notmuch are on PATH.",
     parameters: { type: "object", additionalProperties: false, properties: {} },
-    output: { schema: { type: "object", additionalProperties: true }, render: (_a, v) => [{ type: "text", text: JSON.stringify(v) }] },
+    output: { schema: { type: "object", additionalProperties: true }, render: (_a, v) => [{ type: "text", text: JSON.stringify(v, null, 2) }] },
     timeoutMs: 5_000,
     isConcurrencySafe: () => true,
     async execute() {
@@ -29,6 +29,39 @@ export function apply(ctx, config = {}) {
     },
     presentCall: () => ({ card: "generic", title: "mail status" }),
     presentResult: (_a, r) => ({ card: "generic", title: "mail status", content: r.content }),
+  });
+
+  ctx.tools.register({
+    name: "mail_unread",
+    description: "Unread mail count (notmuch tag:unread preferred; else recent himalaya INBOX). Read-only.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: { limit: { type: "number" } },
+    },
+    output: {
+      schema: { type: "object", additionalProperties: true },
+      render: (_a, v) => [
+        {
+          type: "text",
+          text:
+            v.ok === false
+              ? v.error
+              : `backend=${v.backend} count=${v.count}${v.note ? `\n${v.note}` : ""}\n${JSON.stringify(v.samples || v.envelopes || [], null, 2)}`,
+        },
+      ],
+    },
+    timeoutMs,
+    isConcurrencySafe: () => true,
+    async execute(args) {
+      try {
+        return await mailUnread({ limit: args?.limit, timeoutMs });
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    },
+    presentCall: () => ({ card: "generic", title: "mail unread" }),
+    presentResult: (_a, r) => ({ card: "generic", title: "mail unread", content: r.content }),
   });
 
   ctx.tools.register({
